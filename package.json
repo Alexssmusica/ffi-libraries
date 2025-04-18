@@ -1,0 +1,64 @@
+{
+  "name": "ffi-libraries",
+  "version": "1.0.0",
+  "description": "A Node.js library for loading and calling functions from dynamic libraries",
+  "main": "lib/index.js",
+  "license": "MIT",
+  "scripts": {
+    "install": "node-gyp rebuild",
+    "prebuild:dev": "node uploadBinarios.js",
+    "prebuild:master": "prebuild",
+    "clean:lib": "rimraf lib/ && rimraf tsconfig-build.tsbuildinfo",
+    "build": "npm run clean:lib && tsc -p tsconfig-build.json && node-gyp rebuild",
+    "rebuild": "node-gyp rebuild",
+    "release": "node release.js"
+  },
+  "dependencies": {
+    "bindings": "^1.5.0",
+    "node-addon-api": "^8.3.1",
+    "node-gyp": "^11.2.0"
+  },
+  "devDependencies": {
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/commit-analyzer": "^13.0.1",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^11.0.1",
+    "@semantic-release/npm": "^12.0.1",
+    "@semantic-release/release-notes-generator": "^14.0.3",
+    "@tsconfig/node18": "^18.2.4",
+    "@types/bindings": "^1.5.5",
+    "@types/node": "22.12.0",
+    "prebuild": "^13.0.1",
+    "rimraf": "^6.0.1",
+    "typescript": "5.7.3"
+  },
+  "keywords": [
+    "ffi",
+    "dynamic",
+    "library",
+    "dll",
+    "so",
+    "dylib",
+    "libffi",
+    "binding"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "gypfile": true,
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:Alexssmusica/ffi-libraries.git"
+  },
+  "author": {
+    "name": "Alex Santos de Souza",
+    "url": "https://github.com/Alexssmusica/ffi-libraries/#readme",
+    "email": "alexssmusica@gmail.com"
+  },
+  "binary": {
+    "module_name": "printer_electron_node",
+    "module_path": "build/Release/",
+    "host": "https://github.com/Alexssmusica/ffi-libraries/releases/download/",
+    "remote_path": "v{version}"
+  }
+}

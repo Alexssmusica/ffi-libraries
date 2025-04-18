@@ -1,0 +1,10 @@
+*~
+.c9*
+prebuilds/
+build/
+.env
+.prebuildrc
+node_modules/
+lib/
+tsconfig-build.tsbuildinfo
+

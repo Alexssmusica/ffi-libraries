@@ -1,0 +1,23 @@
+name: CI Dev
+on:
+  push:
+    branches:
+      - dev
+jobs:
+  CI-dev:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+      
+      - name: Configurar Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+      
+      - name: Instalar dependências
+        run: npm install --no-save
+      
+      - name: Rebuild do projeto
+        run: npm run rebuild
