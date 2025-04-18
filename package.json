@@ -49,7 +49,7 @@
   "gypfile": true,
   "repository": {
     "type": "git",
-    "url": "git@github.com:Alexssmusica/ffi-libraries.git"
+    "url": "git+https://github.com/Alexssmusica/ffi-libraries.git"
   },
   "author": {
     "name": "Alex Santos de Souza",
@@ -57,7 +57,7 @@
     "email": "alexssmusica@gmail.com"
   },
   "binary": {
-    "module_name": "printer_electron_node",
+    "module_name": "ffi_libraries",
     "module_path": "build/Release/",
     "host": "https://github.com/Alexssmusica/ffi-libraries/releases/download/",
     "remote_path": "v{version}"
