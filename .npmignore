@@ -2,6 +2,7 @@
 *~
 .c9*
 prebuilds/
+examples/
 build/
 .releaserc.json
 .env

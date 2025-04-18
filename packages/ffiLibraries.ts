@@ -11,6 +11,20 @@ export interface ForeignFunction<TReturn = any, TArgs extends any[] = any[]> {
 
 const ffiBindings = require('bindings')('ffi_libraries');
 
+export interface Library {
+  /**
+   * @param path Path to the dynamic library
+   * @param functions Object containing function definitions
+   */
+  new <T>(path: string, functions: FunctionDefinitions): T;
+
+  /**
+   * @param path Path to the dynamic library
+   * @param functions Object containing function definitions
+   */
+  <T>(path: string, functions: FunctionDefinitions): T;
+}
+
 /**
  * Creates a new library instance with function definitions
  * @param {string} path Path to the dynamic library
@@ -22,7 +36,7 @@ const ffiBindings = require('bindings')('ffi_libraries');
  *   'GetLastError': ['uint32', []]
  * });
  */
-export class Library {
+class LibraryImpl {
   constructor(path: string, functions: FunctionDefinitions) {
     if (typeof path !== 'string') {
       throw new TypeError('Library path must be a string');
@@ -43,3 +57,5 @@ export class Library {
     }
   }
 }
+
+export const Library: Library = LibraryImpl as any;
