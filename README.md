@@ -2,7 +2,7 @@
 
 [English](#ffi-libraries) | [Português](#ffi-libraries-português)
 
-A powerful Node.js library for loading and calling functions from dynamic libraries (DLLs, SOs, DYLIBs) with support for both Node.js and Electron environments.
+A powerful Node.js library for loading and calling functions from dynamic libraries DLLs with support for both Node.js and Electron environments.
 
 ## Features
 
@@ -200,7 +200,7 @@ For support, issues, or feature requests, please use the [GitHub issues page](ht
 
 # FFI Libraries (Português)
 
-Uma poderosa biblioteca Node.js para carregar e chamar funções de bibliotecas dinâmicas (DLLs, SOs, DYLIBs) com suporte para ambientes Node.js e Electron.
+Uma poderosa biblioteca Node.js para carregar e chamar funções de bibliotecas dinâmicas DLLs com suporte para ambientes Node.js e Electron.
 
 ## Características
 
