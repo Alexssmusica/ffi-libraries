@@ -11,7 +11,7 @@
     "clean:lib": "rimraf lib/ && rimraf tsconfig-build.tsbuildinfo",
     "build": "npm run clean:lib && tsc -p tsconfig-build.json && node-gyp rebuild",
     "rebuild": "node-gyp rebuild",
-    "release": "node release.js"
+    "release": "npm run build && node release.js"
   },
   "dependencies": {
     "bindings": "^1.5.0",
