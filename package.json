@@ -1,6 +1,6 @@
 {
   "name": "ffi-libraries",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "A Node.js library for loading and calling functions from dynamic libraries",
   "main": "lib/index.js",
   "license": "MIT",
