@@ -19,7 +19,7 @@ std::map<ValueType, size_t> typeSize{
     std::make_pair(TYPE_POINTER, sizeof(void *)),
     std::make_pair(TYPE_BOOL, sizeof(bool))};
 
-ValueType GetTypeFromString(const std::string &typeStr)
+ValueType GetTypeFromString(const std::string &typeStr, Napi::Env env)
 {
     if (typeStr == "void")
         return TYPE_VOID;
@@ -49,7 +49,7 @@ ValueType GetTypeFromString(const std::string &typeStr)
         return TYPE_POINTER;
     if (typeStr == "bool")
         return TYPE_BOOL;
-    throw std::runtime_error("Unknown type: " + typeStr);
+    throw Napi::Error::New(env, "Unknown type: " + typeStr);
 }
 
 void *ConvertJsValueToNative(Napi::Value value, ValueType type, std::vector<void *> &allocations)
@@ -142,7 +142,8 @@ void *ConvertJsValueToNative(Napi::Value value, ValueType type, std::vector<void
             {
                 std::string str = value.As<Napi::String>().Utf8Value();
                 char *val = new char[str.length() + 1];
-                std::strcpy(val, str.c_str());
+                strncpy(val, str.c_str(), str.length());
+                val[str.length()] = '\0';
                 allocations.push_back(val);
                 result = val;
             }
@@ -174,7 +175,7 @@ void *ConvertJsValueToNative(Napi::Value value, ValueType type, std::vector<void
             break;
         }
         default:
-            throw std::runtime_error("Unsupported type in conversion");
+            throw Napi::Error::New(value.Env(), "Unsupported type in conversion");
         }
     }
     catch (const Napi::Error &)
@@ -183,11 +184,11 @@ void *ConvertJsValueToNative(Napi::Value value, ValueType type, std::vector<void
     }
     catch (const std::exception &e)
     {
-        throw std::runtime_error(std::string("Error converting value: ") + e.what());
+        throw Napi::Error::New(value.Env(), std::string("Error converting value: ") + e.what());
     }
     catch (...)
     {
-        throw std::runtime_error("Unknown error converting value");
+        throw Napi::Error::New(value.Env(), "Unknown error converting value");
     }
 
     return result;
@@ -233,7 +234,7 @@ Napi::Value ConvertNativeToJsValue(Napi::Env env, void *data, ValueType type)
         case TYPE_BOOL:
             return Napi::Boolean::New(env, *static_cast<bool *>(data));
         default:
-            throw std::runtime_error("Unsupported type in conversion");
+            throw Napi::Error::New(env, "Unsupported type in conversion");
         }
     }
     catch (const Napi::Error &)
@@ -242,10 +243,10 @@ Napi::Value ConvertNativeToJsValue(Napi::Env env, void *data, ValueType type)
     }
     catch (const std::exception &e)
     {
-        throw std::runtime_error(std::string("Error converting value: ") + e.what());
+        throw Napi::Error::New(env, std::string("Error converting value: ") + e.what());
     }
     catch (...)
     {
-        throw std::runtime_error("Unknown error converting value");
+        throw Napi::Error::New(env, "Unknown error converting value");
     }
 }

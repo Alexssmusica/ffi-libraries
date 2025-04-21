@@ -23,7 +23,7 @@ enum ValueType
     TYPE_BOOL
 };
 
-ValueType GetTypeFromString(const std::string &typeStr);
+ValueType GetTypeFromString(const std::string &typeStr, Napi::Env env);
 void *ConvertJsValueToNative(Napi::Value value, ValueType type, std::vector<void *> &allocations);
 Napi::Value ConvertNativeToJsValue(Napi::Env env, void *data, ValueType type);
 void *CallFunction(void *funcPtr, ValueType returnType, const std::vector<void *> &args);
