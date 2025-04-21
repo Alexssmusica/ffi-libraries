@@ -3,7 +3,7 @@
 #include <iostream>
 #include <napi.h>
 
-void *CallFunction(void *funcPtr, ValueType returnType, const std::vector<void *> &args)
+void *CallNativeFunction(void *funcPtr, ValueType returnType, const std::vector<void *> &args)
 {
     if (!funcPtr)
     {
@@ -211,4 +211,4 @@ void *CallFunction(void *funcPtr, ValueType returnType, const std::vector<void *
     }
 
     return result;
-}
+} 

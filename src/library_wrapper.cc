@@ -153,7 +153,7 @@ Napi::Function LibraryWrapper::CreateSyncWrapper(Napi::Env env, const FunctionIn
             }
 
             ValueType returnType = GetTypeFromString(funcInfo.returnType, cbEnv);
-            void* result = CallFunction(funcInfo.ptr, returnType, args);
+            void* result = CallNativeFunction(funcInfo.ptr, returnType, args);
 
             Napi::Value jsResult = ConvertNativeToJsValue(cbEnv, result, returnType);
 
@@ -203,7 +203,7 @@ Napi::Function LibraryWrapper::CreateAsyncWrapper(Napi::Env env, const FunctionI
 
                 void Execute() override {
                     try {
-                        result = CallFunction(funcPtr, returnType, args);
+                        result = CallNativeFunction(funcPtr, returnType, args);
                     } catch (const std::exception& e) {
                         SetError(e.what());
                     }

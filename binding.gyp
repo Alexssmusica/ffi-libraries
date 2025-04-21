@@ -6,7 +6,7 @@
     'sources': [ 
       'src/ffi_loader.cc',
       'src/type_converter.cc',
-      'src/function_impl.cc',
+      'src/native_function_caller.cc',
       'src/library_wrapper.cc'
     ],
     'include_dirs': [
