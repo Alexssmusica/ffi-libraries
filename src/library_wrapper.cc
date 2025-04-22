@@ -43,15 +43,28 @@ LibraryWrapper::LibraryWrapper(const Napi::CallbackInfo &info)
 
 #ifdef _WIN32
     void *handle = LoadLibraryA(libraryPath.c_str());
+    if (!handle) {
+        DWORD error = GetLastError();
+        char* errorMsg = nullptr;
+        FormatMessageA(
+            FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+            NULL,
+            error,
+            MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+            (LPSTR)&errorMsg,
+            0,
+            NULL
+        );
+        std::string errorStr = "Failed to load library: " + libraryPath + ". Error: " + std::to_string(error) + " - " + (errorMsg ? errorMsg : "Unknown error");
+        if (errorMsg) {
+            LocalFree(errorMsg);
+        }
+        Napi::Error::New(env, errorStr).ThrowAsJavaScriptException();
+        return;
+    }
 #else
     void *handle = dlopen(libraryPath.c_str(), RTLD_NOW);
 #endif
-
-    if (!handle)
-    {
-        Napi::Error::New(env, "Failed to load library: " + libraryPath).ThrowAsJavaScriptException();
-        return;
-    }
 
     Napi::Object funcDefs = info[1].As<Napi::Object>();
     Napi::Array funcNames = funcDefs.GetPropertyNames();
