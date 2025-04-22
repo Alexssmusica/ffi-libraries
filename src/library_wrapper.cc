@@ -43,9 +43,10 @@ LibraryWrapper::LibraryWrapper(const Napi::CallbackInfo &info)
 
 #ifdef _WIN32
     void *handle = LoadLibraryA(libraryPath.c_str());
-    if (!handle) {
+    if (!handle)
+    {
         DWORD error = GetLastError();
-        char* errorMsg = nullptr;
+        char *errorMsg = nullptr;
         FormatMessageA(
             FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
             NULL,
@@ -53,10 +54,10 @@ LibraryWrapper::LibraryWrapper(const Napi::CallbackInfo &info)
             MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
             (LPSTR)&errorMsg,
             0,
-            NULL
-        );
+            NULL);
         std::string errorStr = "Failed to load library: " + libraryPath + ". Error: " + std::to_string(error) + " - " + (errorMsg ? errorMsg : "Unknown error");
-        if (errorMsg) {
+        if (errorMsg)
+        {
             LocalFree(errorMsg);
         }
         Napi::Error::New(env, errorStr).ThrowAsJavaScriptException();
