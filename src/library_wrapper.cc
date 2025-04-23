@@ -4,6 +4,27 @@
 
 #ifdef _WIN32
 #include <windows.h>
+
+static WCHAR* UTF8toWCHAR(const char* inputString)
+{
+    int outputSize = MultiByteToWideChar(CP_UTF8, 0, inputString, -1, NULL, 0);
+    if (outputSize == 0)
+        return NULL;
+
+    WCHAR* outputString = (WCHAR*)malloc(outputSize * sizeof(WCHAR));
+    if (outputString == NULL) {
+        SetLastError(ERROR_OUTOFMEMORY);
+        return NULL;
+    }
+
+    if (MultiByteToWideChar(CP_UTF8, 0, inputString, -1, outputString, outputSize) != outputSize) {
+        free(outputString);
+        return NULL;
+    }
+
+    return outputString;
+}
+
 #else
 #include <dlfcn.h>
 #endif
@@ -42,11 +63,24 @@ LibraryWrapper::LibraryWrapper(const Napi::CallbackInfo &info)
     std::string libraryPath = info[0].As<Napi::String>().Utf8Value();
 
 #ifdef _WIN32
-    void *handle = LoadLibraryA(libraryPath.c_str());
+    UINT errorMode = GetErrorMode();
+    SetErrorMode(errorMode | SEM_FAILCRITICALERRORS);
+
+    WCHAR* unicodeFilename = UTF8toWCHAR(libraryPath.c_str());
+    if (!unicodeFilename) {
+        Napi::Error::New(env, "Failed to convert library path to Unicode").ThrowAsJavaScriptException();
+        return;
+    }
+
+    void* handle = LoadLibraryW(unicodeFilename);
+    DWORD error = GetLastError();
+    
+    free(unicodeFilename);
+    SetErrorMode(errorMode);
+
     if (!handle)
     {
-        DWORD error = GetLastError();
-        char *errorMsg = nullptr;
+        char* errorMsg = nullptr;
         FormatMessageA(
             FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
             NULL,
