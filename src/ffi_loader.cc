@@ -3,11 +3,12 @@
 #include "type_registry.h"
 #include "type_system.h"
 
-namespace {
-    void RegisterTypeConverters() {
-        auto& registry = ffi_libraries::TypeRegistry::instance();
-        
-        // Register numeric types
+namespace
+{
+    void RegisterTypeConverters()
+    {
+        auto &registry = ffi_libraries::TypeRegistry::instance();
+
         registry.registerConverter(ffi_libraries::ValueType::Int8, ffi_libraries::TypeConverter::forType(ffi_libraries::ValueType::Int8));
         registry.registerConverter(ffi_libraries::ValueType::UInt8, ffi_libraries::TypeConverter::forType(ffi_libraries::ValueType::UInt8));
         registry.registerConverter(ffi_libraries::ValueType::Int16, ffi_libraries::TypeConverter::forType(ffi_libraries::ValueType::Int16));
@@ -18,19 +19,14 @@ namespace {
         registry.registerConverter(ffi_libraries::ValueType::UInt64, ffi_libraries::TypeConverter::forType(ffi_libraries::ValueType::UInt64));
         registry.registerConverter(ffi_libraries::ValueType::Float, ffi_libraries::TypeConverter::forType(ffi_libraries::ValueType::Float));
         registry.registerConverter(ffi_libraries::ValueType::Double, ffi_libraries::TypeConverter::forType(ffi_libraries::ValueType::Double));
-        
-        // Register string type
         registry.registerConverter(ffi_libraries::ValueType::String, ffi_libraries::TypeConverter::forType(ffi_libraries::ValueType::String));
-        
-        // Register pointer type
         registry.registerConverter(ffi_libraries::ValueType::Pointer, ffi_libraries::TypeConverter::forType(ffi_libraries::ValueType::Pointer));
-        
-        // Register boolean type
         registry.registerConverter(ffi_libraries::ValueType::Bool, ffi_libraries::TypeConverter::forType(ffi_libraries::ValueType::Bool));
     }
 }
 
-Napi::Object Init(Napi::Env env, Napi::Object exports) {
+Napi::Object Init(Napi::Env env, Napi::Object exports)
+{
     RegisterTypeConverters();
     return ffi_libraries::Library::Init(env, exports);
 }
