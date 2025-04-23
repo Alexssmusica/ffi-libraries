@@ -25,7 +25,16 @@ namespace {
         {"double", ValueType::Double},
         {"string", ValueType::String},
         {"pointer", ValueType::Pointer},
-        {"bool", ValueType::Bool}
+        {"bool", ValueType::Bool},
+        // Add aliases for common C types
+        {"int", ValueType::Int32},
+        {"unsigned int", ValueType::UInt32},
+        {"long", ValueType::Int64},
+        {"unsigned long", ValueType::UInt64},
+        {"short", ValueType::Int16},
+        {"unsigned short", ValueType::UInt16},
+        {"char", ValueType::Int8},
+        {"unsigned char", ValueType::UInt8}
     };
 
     // Concrete type converter implementations

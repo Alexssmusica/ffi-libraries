@@ -22,6 +22,8 @@ const lib = new Library(_libraryPath, {
   TrocarCodigoDeAtivacao: ['string', ['int', 'string', 'int', 'string', 'string']]
 });
 
+console.log(lib);
+
 async function iniciar() {
   try {
     const versao = await new Promise((resolve, reject) => {
