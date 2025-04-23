@@ -8,40 +8,10 @@ const funcDefs = {
   AcionaGuilhotina: ['int32', ['int32']]
 };
 
-
-const lib = new Library(_libraryPath, funcDefs);
-console.log(lib);
-
-async function iniciar() {
-  try {
-    const abreConexaoImpressora = await new Promise((resolve, reject) => {
-      lib.IniciaPorta('USB', (err, result) => {
-        console.log('IniciaPorta result:', result);
-        if (err) reject(err);
-        else resolve(result);
-      });
-    });
-    console.log('AbreConexaoImpressora result:', abreConexaoImpressora);
-
-    const corteTotal = await new Promise((resolve, reject) => {
-      lib.AcionaGuilhotina.async(1, (err, result) => {
-        if (err) reject(err);
-        else resolve(result);
-      });
-    });
-    console.log('AcionaGuilhotina result:', corteTotal);
-
-    const fecharConexaoImpressora = await new Promise((resolve, reject) => {
-      lib.FechaPorta.async((err, result) => {
-        if (err) reject(err);
-        else resolve(result);
-      });
-    });
-    console.log('FechaConexaoImpressora result:', fecharConexaoImpressora);
-  } catch (error) {
-    console.error('Error:', error);
-    console.error('Stack:', error.stack);
-  }
+try {
+  const lib = new Library(_libraryPath, funcDefs);
+  console.log(lib);
+} catch (error) {
+  console.error('Error:', error);
+  console.error('Stack:', error.stack);
 }
-
-iniciar()
