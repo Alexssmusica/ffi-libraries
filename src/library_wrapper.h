@@ -1,29 +1,43 @@
 #pragma once
 
+#include "type_system.h"
 #include <napi.h>
 #include <string>
+#include <memory>
+#include <unordered_map>
 #include <vector>
 #include <map>
+#include <windows.h>
 
-struct FunctionInfo
-{
-    void *ptr;
-    std::string returnType;
-    std::vector<std::string> paramTypes;
-};
+namespace ffi_libraries {
 
-class LibraryWrapper : public Napi::ObjectWrap<LibraryWrapper>
-{
+class Library : public Napi::ObjectWrap<Library> {
 public:
     static Napi::Object Init(Napi::Env env, Napi::Object exports);
-    LibraryWrapper(const Napi::CallbackInfo &info);
-    ~LibraryWrapper();
+    Library(const Napi::CallbackInfo& info);
+    ~Library();
 
 private:
-    struct Impl;
-    Impl *impl;
+    static Napi::FunctionReference constructor;
 
-    Napi::Value Close(const Napi::CallbackInfo &info);
-    Napi::Function CreateSyncWrapper(Napi::Env env, const FunctionInfo &funcInfo);
-    Napi::Function CreateAsyncWrapper(Napi::Env env, const FunctionInfo &funcInfo);
+    using LibraryHandle = HMODULE;
+
+    struct FunctionInfo {
+        void* funcPtr;
+        ValueType returnType;
+        std::vector<ValueType> paramTypes;
+    };
+
+    LibraryHandle handle_;
+    bool isOpen_;
+    std::map<std::string, FunctionInfo> functions_;
+
+    void LoadLibrary(const std::string& path);
+    void* GetFunctionPointer(const std::string& name);
+    std::vector<NativeValue> PrepareArguments(const Napi::CallbackInfo& info, const FunctionInfo& funcInfo);
+
+    Napi::Value CallFunction(const Napi::CallbackInfo& info);
+    void Close(const Napi::CallbackInfo& info);
 };
+
+} // namespace ffi_libraries

@@ -1,8 +1,11 @@
 #include "library_wrapper.h"
-#include "common.h"
+#include "type_system.h"
+#include "native_function_caller.h"
 #include <iostream>
-
-#ifdef _WIN32
+#include <stdexcept>
+#include <system_error>
+#include <future>
+#include <thread>
 #include <windows.h>
 
 static WCHAR* UTF8toWCHAR(const char* inputString)
@@ -25,261 +28,265 @@ static WCHAR* UTF8toWCHAR(const char* inputString)
     return outputString;
 }
 
-#else
-#include <dlfcn.h>
-#endif
+namespace ffi_libraries {
 
-struct LibraryWrapper::Impl
-{
-    void *libraryHandle;
-    std::map<std::string, FunctionInfo> functions;
-};
+Napi::FunctionReference Library::constructor;
 
-Napi::Object LibraryWrapper::Init(Napi::Env env, Napi::Object exports)
-{
+Napi::Object Library::Init(Napi::Env env, Napi::Object exports) {
     Napi::HandleScope scope(env);
 
-    Napi::Function func = DefineClass(env, "Library", {InstanceMethod("close", &LibraryWrapper::Close)});
+    Napi::Function func = DefineClass(env, "Library", {
+        InstanceMethod("callFunction", &Library::CallFunction),
+        InstanceMethod("close", &Library::Close)
+    });
 
-    Napi::FunctionReference *constructor = new Napi::FunctionReference();
-    *constructor = Napi::Persistent(func);
-    env.SetInstanceData(constructor);
+    constructor = Napi::Persistent(func);
+    constructor.SuppressDestruct();
 
     exports.Set("Library", func);
     return exports;
 }
 
-LibraryWrapper::LibraryWrapper(const Napi::CallbackInfo &info)
-    : Napi::ObjectWrap<LibraryWrapper>(info)
-{
+Library::Library(const Napi::CallbackInfo& info) 
+    : Napi::ObjectWrap<Library>(info), handle_(nullptr), isOpen_(false) {
     Napi::Env env = info.Env();
 
-    if (info.Length() < 2 || !info[0].IsString() || !info[1].IsObject())
-    {
-        Napi::TypeError::New(env, "Expected library path and function definitions").ThrowAsJavaScriptException();
+    if (info.Length() < 2 || !info[0].IsString() || !info[1].IsObject()) {
+        Napi::TypeError::New(env, "Expected (string, object) arguments").ThrowAsJavaScriptException();
         return;
     }
 
-    std::string libraryPath = info[0].As<Napi::String>().Utf8Value();
+    std::string path = info[0].As<Napi::String>();
+    LoadLibrary(path);
 
-#ifdef _WIN32
-    UINT errorMode = GetErrorMode();
-    SetErrorMode(errorMode | SEM_FAILCRITICALERRORS);
-
-    WCHAR* unicodeFilename = UTF8toWCHAR(libraryPath.c_str());
-    if (!unicodeFilename) {
-        Napi::Error::New(env, "Failed to convert library path to Unicode").ThrowAsJavaScriptException();
-        return;
-    }
-
-    void* handle = LoadLibraryW(unicodeFilename);
-    DWORD error = GetLastError();
-    
-    free(unicodeFilename);
-    SetErrorMode(errorMode);
-
-    if (!handle)
-    {
-        char* errorMsg = nullptr;
-        FormatMessageA(
-            FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-            NULL,
-            error,
-            MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-            (LPSTR)&errorMsg,
-            0,
-            NULL);
-        std::string errorStr = "Failed to load library: " + libraryPath + ". Error: " + std::to_string(error) + " - " + (errorMsg ? errorMsg : "Unknown error");
-        if (errorMsg)
-        {
-            LocalFree(errorMsg);
-        }
-        Napi::Error::New(env, errorStr).ThrowAsJavaScriptException();
-        return;
-    }
-#else
-    void *handle = dlopen(libraryPath.c_str(), RTLD_NOW);
-#endif
-
+    // Process function definitions
     Napi::Object funcDefs = info[1].As<Napi::Object>();
     Napi::Array funcNames = funcDefs.GetPropertyNames();
-    Napi::Object thisObj = info.This().As<Napi::Object>();
 
-    for (uint32_t i = 0; i < funcNames.Length(); i++)
-    {
+    for (uint32_t i = 0; i < funcNames.Length(); i++) {
         Napi::Value funcName = funcNames[i];
-        Napi::Value funcDef = funcDefs.Get(funcName);
-
-        if (!funcDef.IsArray())
-            continue;
-
-        Napi::Array def = funcDef.As<Napi::Array>();
-        if (def.Length() != 2)
-            continue;
-
-        std::string returnType = def.Get(uint32_t(0)).As<Napi::String>().Utf8Value();
-
-        Napi::Array paramTypes = def.Get(uint32_t(1)).As<Napi::Array>();
-        std::vector<std::string> paramTypeList;
-
-        for (uint32_t j = 0; j < paramTypes.Length(); j++)
-        {
-            paramTypeList.push_back(paramTypes.Get(j).As<Napi::String>().Utf8Value());
+        std::string name = funcName.As<Napi::String>();
+        
+        Napi::Array funcDef = funcDefs.Get(funcName).As<Napi::Array>();
+        if (funcDef.Length() != 2 || !funcDef.Get(uint32_t(0)).IsString() || !funcDef.Get(uint32_t(1)).IsArray()) {
+            throw Napi::TypeError::New(env, "Invalid function definition for " + name);
         }
 
-#ifdef _WIN32
-        void *funcPtr = GetProcAddress(static_cast<HMODULE>(handle), funcName.As<Napi::String>().Utf8Value().c_str());
-#else
-        void *funcPtr = dlsym(handle, funcName.As<Napi::String>().Utf8Value().c_str());
-#endif
+        // Get return type and parameter types
+        std::string returnTypeStr = funcDef.Get(uint32_t(0)).As<Napi::String>();
+        Napi::Array paramTypesArr = funcDef.Get(uint32_t(1)).As<Napi::Array>();
 
-        if (!funcPtr)
-        {
-            Napi::Error::New(env, "Failed to get function pointer: " + funcName.As<Napi::String>().Utf8Value()).ThrowAsJavaScriptException();
-            continue;
-        }
-
+        // Create function info
         FunctionInfo funcInfo;
-        funcInfo.ptr = funcPtr;
-        funcInfo.returnType = returnType;
-        funcInfo.paramTypes = paramTypeList;
+        funcInfo.returnType = TypeConverter::getTypeFromString(returnTypeStr, env);
+        funcInfo.funcPtr = GetFunctionPointer(name);
 
-        Napi::Function mainFunc = Napi::Function::New(env, [funcInfo](const Napi::CallbackInfo &cbInfo) -> Napi::Value {
-            Napi::Env cbEnv = cbInfo.Env();
-            
-            bool hasCallback = cbInfo.Length() > 0 && cbInfo[cbInfo.Length()-1].IsFunction();
-            
-            if (hasCallback) {
-                std::vector<void*> args;
-                std::vector<void*> allocations;
-                
-                try {
-                    for (size_t i = 0; i < cbInfo.Length() - 1 && i < funcInfo.paramTypes.size(); i++) {
-                        ValueType type = GetTypeFromString(funcInfo.paramTypes[i], cbEnv);
-                        void* arg = ConvertJsValueToNative(cbInfo[i], type, allocations);
-                        args.push_back(arg);
-                    }
+        // Store parameter types
+        uint32_t paramLength = paramTypesArr.Length();
+        funcInfo.paramTypes.reserve(paramLength);
+        for (uint32_t j = 0; j < paramLength; j++) {
+            Napi::Value val = paramTypesArr[j];
+            if (!val.IsString()) {
+                throw Napi::TypeError::New(env, "Parameter types must be strings");
+            }
+            std::string typeStr = val.As<Napi::String>();
+            funcInfo.paramTypes.push_back(TypeConverter::getTypeFromString(typeStr, env));
+        }
 
-                    Napi::Function callback = cbInfo[cbInfo.Length()-1].As<Napi::Function>();
-                    
-                    class AsyncWorker : public Napi::AsyncWorker {
-                    public:
-                        AsyncWorker(Napi::Function& callback, void* funcPtr, 
-                                ValueType returnType, std::vector<void*> args)
-                            : Napi::AsyncWorker(callback), 
-                            funcPtr(funcPtr), returnType(returnType), args(args) {}
+        // Store function info
+        functions_[name] = std::move(funcInfo);
 
-                        void Execute() override {
-                            try {
-                                result = CallNativeFunction(funcPtr, returnType, args);
-                            } catch (const std::exception& e) {
-                                SetError(e.what());
-                            }
-                        }
+        // Create function wrapper with captured name
+        auto wrapper = [this, name](const Napi::CallbackInfo& info) -> Napi::Value {
+            auto it = functions_.find(name);
+            if (it == functions_.end()) {
+                throw Napi::Error::New(info.Env(), "Function not defined: " + name);
+            }
 
-                        void OnOK() override {
-                            Napi::HandleScope scope(Env());
-                            Callback().Call({Env().Null(), ConvertNativeToJsValue(Env(), result, returnType)});
-                            
-                            if (result && returnType != TYPE_VOID) {
-                                delete[] static_cast<uint8_t*>(result);
-                            }
-                            
-                            for (void* ptr : args) {
-                                delete[] static_cast<uint8_t*>(ptr);
-                            }
-                        }
+            const FunctionInfo& funcInfo = it->second;
+            std::vector<NativeValue> nativeArgs;
+            nativeArgs.reserve(funcInfo.paramTypes.size());
 
-                        void OnError(const Napi::Error& e) override {
-                            Napi::HandleScope scope(Env());
-                            Callback().Call({e.Value(), Env().Undefined()});
-                            
-                            for (void* ptr : args) {
-                                delete[] static_cast<uint8_t*>(ptr);
-                            }
-                        }
+            // Convert arguments
+            size_t expectedArgs = funcInfo.paramTypes.size();
+            bool isAsync = false;
+            Napi::Function callback;
 
-                    private:
-                        void* funcPtr;
-                        ValueType returnType;
-                        std::vector<void*> args;
-                        void* result = nullptr;
-                    };
+            // Check if last argument is a callback for async call
+            if (info.Length() > 0 && info[info.Length() - 1].IsFunction()) {
+                callback = info[info.Length() - 1].As<Napi::Function>();
+                isAsync = true;
+            }
 
-                    AsyncWorker* worker = new AsyncWorker(callback, funcInfo.ptr, 
-                        GetTypeFromString(funcInfo.returnType, cbEnv), std::move(args));
-                    worker->Queue();
-
-                    return cbEnv.Undefined();
-                } catch (const std::exception& e) {
-                    for (void* ptr : allocations) {
-                        delete[] static_cast<uint8_t*>(ptr);
-                    }
-                    throw Napi::Error::New(cbEnv, e.what());
+            // Convert arguments (excluding callback if async)
+            for (size_t i = 0; i < expectedArgs; i++) {
+                if (i >= info.Length() || (isAsync && i >= info.Length() - 1)) {
+                    throw Napi::TypeError::New(info.Env(), "Not enough arguments");
                 }
-            } else {
-                std::vector<void*> args;
-                std::vector<void*> allocations;
 
                 try {
-                    for (size_t i = 0; i < cbInfo.Length() && i < funcInfo.paramTypes.size(); i++) {
-                        ValueType type = GetTypeFromString(funcInfo.paramTypes[i], cbEnv);
-                        void* arg = ConvertJsValueToNative(cbInfo[i], type, allocations);
-                        args.push_back(arg);
-                    }
-
-                    ValueType returnType = GetTypeFromString(funcInfo.returnType, cbEnv);
-                    void* result = CallNativeFunction(funcInfo.ptr, returnType, args);
-
-                    Napi::Value jsResult = ConvertNativeToJsValue(cbEnv, result, returnType);
-
-                    for (void* ptr : allocations) {
-                        delete[] static_cast<uint8_t*>(ptr);
-                    }
-                    if (result && returnType != TYPE_VOID) {
-                        delete[] static_cast<uint8_t*>(result);
-                    }
-
-                    return jsResult;
-                } catch (const std::exception& e) {
-                    for (void* ptr : allocations) {
-                        delete[] static_cast<uint8_t*>(ptr);
-                    }
-                    throw Napi::Error::New(cbEnv, e.what());
+                    auto converter = TypeConverter::forType(funcInfo.paramTypes[i]);
+                    nativeArgs.push_back(converter->toNative(info[i]));
+                } catch (const TypeConversionError& e) {
+                    throw Napi::TypeError::New(info.Env(), e.what());
                 }
             }
-        });
-        mainFunc.Set("async", mainFunc);
-        thisObj.Set(funcName, mainFunc);
+
+            if (isAsync) {
+                // Create a ThreadSafeFunction for the callback
+                auto tsfn = Napi::ThreadSafeFunction::New(
+                    info.Env(),
+                    callback,
+                    "Async Callback",
+                    0,
+                    1
+                );
+
+                // Launch async operation
+                std::thread([this, tsfn, funcPtr = funcInfo.funcPtr, returnType = funcInfo.returnType, args = std::move(nativeArgs)]() mutable {
+                    try {
+                        // Call the native function
+                        auto result = CallNativeFunction(funcPtr, returnType, args);
+                        
+                        // Call back with the result
+                        tsfn.BlockingCall([result = std::move(result)](Napi::Env env, Napi::Function jsCallback) {
+                            try {
+                                auto converter = TypeConverter::forType(result.getType());
+                                jsCallback.Call({env.Null(), converter->toJS(env, result)});
+                            } catch (const std::exception& e) {
+                                jsCallback.Call({Napi::Error::New(env, e.what()).Value(), env.Null()});
+                            }
+                        });
+                    } catch (const std::exception& e) {
+                        std::string error = e.what();
+                        tsfn.BlockingCall([error = std::move(error)](Napi::Env env, Napi::Function jsCallback) {
+                            jsCallback.Call({Napi::Error::New(env, error).Value(), env.Null()});
+                        });
+                    }
+
+                    tsfn.Release();
+                }).detach();
+
+                return info.Env().Undefined();
+            } else {
+                // Synchronous call
+                try {
+                    auto result = CallNativeFunction(funcInfo.funcPtr, funcInfo.returnType, nativeArgs);
+                    auto converter = TypeConverter::forType(result.getType());
+                    return converter->toJS(info.Env(), result);
+                } catch (const std::exception& e) {
+                    throw Napi::Error::New(info.Env(), e.what());
+                }
+            }
+        };
+
+        // Create the main function
+        Napi::Function func = Napi::Function::New(env, wrapper, name);
+
+        // Create the async property
+        Napi::Function asyncFunc = Napi::Function::New(env, wrapper, name);
+        func.Set("async", asyncFunc);
+
+        // Set the function on the instance
+        info.This().As<Napi::Object>().Set(name, func);
     }
 }
 
-LibraryWrapper::~LibraryWrapper()
-{
-    if (impl)
-    {
-        if (impl->libraryHandle)
-        {
-#ifdef _WIN32
-            FreeLibrary(static_cast<HMODULE>(impl->libraryHandle));
-#else
-            dlclose(impl->libraryHandle);
-#endif
+Library::~Library() {
+    if (isOpen_) {
+        FreeLibrary(handle_);
+    }
+}
+
+void Library::LoadLibrary(const std::string& path) {
+    HMODULE hModule = NULL;
+    hModule = ::LoadLibraryA(path.c_str());
+    handle_ = hModule;
+    if (!handle_) {
+        DWORD error = GetLastError();
+        throw std::runtime_error("Failed to load library: " + std::to_string(error));
+    }
+
+    isOpen_ = true;
+}
+
+void* Library::GetFunctionPointer(const std::string& name) {
+    if (!isOpen_) {
+        throw std::runtime_error("Library is not open");
+    }
+
+    void* funcPtr = reinterpret_cast<void*>(GetProcAddress(handle_, name.c_str()));
+
+    if (!funcPtr) {
+        throw std::runtime_error("Function not found: " + name);
+    }
+
+    return funcPtr;
+}
+
+std::vector<NativeValue> Library::PrepareArguments(const Napi::CallbackInfo& info, const FunctionInfo& funcInfo) {
+    std::vector<NativeValue> nativeArgs;
+    nativeArgs.reserve(funcInfo.paramTypes.size());
+
+    for (size_t i = 0; i < funcInfo.paramTypes.size(); i++) {
+        if (i >= info.Length()) {
+            throw Napi::TypeError::New(info.Env(), "Not enough arguments");
         }
-        delete impl;
+
+        auto converter = TypeConverter::forType(funcInfo.paramTypes[i]);
+        nativeArgs.push_back(converter->toNative(info[i]));
+    }
+
+    return nativeArgs;
+}
+
+Napi::Value Library::CallFunction(const Napi::CallbackInfo& info) {
+    Napi::Env env = info.Env();
+
+    // Get function name from the function object
+    Napi::Function func = info.This().As<Napi::Object>().Get("name").As<Napi::Function>();
+    std::string funcName = func.Get("name").As<Napi::String>();
+    auto it = functions_.find(funcName);
+    if (it == functions_.end()) {
+        throw Napi::Error::New(env, "Function not defined: " + funcName);
+    }
+
+    const FunctionInfo& funcInfo = it->second;
+    std::vector<NativeValue> nativeArgs;
+    nativeArgs.reserve(funcInfo.paramTypes.size());
+
+    // Convert arguments
+    for (size_t i = 0; i < funcInfo.paramTypes.size(); i++) {
+        if (i >= info.Length()) {
+            throw Napi::TypeError::New(env, "Not enough arguments");
+        }
+
+        try {
+            auto converter = TypeConverter::forType(funcInfo.paramTypes[i]);
+            nativeArgs.push_back(converter->toNative(info[i]));
+        } catch (const TypeConversionError& e) {
+            throw Napi::TypeError::New(env, e.what());
+        }
+    }
+
+    // Call the native function
+    NativeValue result;
+    try {
+        result = CallNativeFunction(funcInfo.funcPtr, funcInfo.returnType, nativeArgs);
+    } catch (const std::exception& e) {
+        throw Napi::Error::New(env, std::string("Error calling native function: ") + e.what());
+    }
+
+    // Convert result back to JS
+    auto converter = TypeConverter::forType(funcInfo.returnType);
+    return converter->toJS(env, result);
+}
+
+void Library::Close(const Napi::CallbackInfo& info) {
+    if (isOpen_) {
+        FreeLibrary(handle_);
+        isOpen_ = false;
     }
 }
 
-Napi::Value LibraryWrapper::Close(const Napi::CallbackInfo &info)
-{
-    if (impl && impl->libraryHandle)
-    {
-#ifdef _WIN32
-        FreeLibrary(static_cast<HMODULE>(impl->libraryHandle));
-#else
-        dlclose(impl->libraryHandle);
-#endif
-        impl->libraryHandle = nullptr;
-    }
-    return info.Env().Undefined();
-}
+} // namespace ffi_libraries

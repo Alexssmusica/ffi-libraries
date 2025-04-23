@@ -26,7 +26,7 @@ async function iniciar() {
   try {
     const abreConexaoImpressora = await new Promise((resolve, reject) => {
      const result = lib.IniciaPorta('USB');
-     resolve(result);
+     resolve(result)
     });
     console.log('AbreConexaoImpressora result:', abreConexaoImpressora);
 
