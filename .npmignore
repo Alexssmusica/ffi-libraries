@@ -23,3 +23,5 @@ packages/
 tsconfig.json
 tsconfig-build.json
 tsconfig-build.tsbuildinfo
+recomendacoes_melhoria.md
+CHANGELOG.md
