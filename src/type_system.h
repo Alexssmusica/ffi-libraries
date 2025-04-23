@@ -97,9 +97,9 @@ public:
 
     NativeValue() : type_(ValueType::Void), value_(std::monostate{}) {}
     
-    template<typename T>
+    template<typename T, typename = std::enable_if_t<!std::is_same_v<std::decay_t<T>, NativeValue>>>
     explicit NativeValue(T&& value) 
-        : type_(TypeToEnum<std::remove_reference_t<T>>::value)
+        : type_(TypeToEnum<std::decay_t<T>>::value)
         , value_(std::forward<T>(value)) {}
     
     // Special constructor for string literals and char*
@@ -107,11 +107,33 @@ public:
         : type_(ValueType::String)
         , value_(CString(str)) {}
 
-    // Copy and move operations can now be defaulted
-    NativeValue(const NativeValue&) = default;
-    NativeValue(NativeValue&&) noexcept = default;
-    NativeValue& operator=(const NativeValue&) = default;
-    NativeValue& operator=(NativeValue&&) noexcept = default;
+    // Copy constructor
+    NativeValue(const NativeValue& other)
+        : type_(other.type_)
+        , value_(other.value_) {}
+
+    // Move constructor
+    NativeValue(NativeValue&& other) noexcept
+        : type_(std::exchange(other.type_, ValueType::Void))
+        , value_(std::exchange(other.value_, std::monostate{})) {}
+
+    // Copy assignment operator
+    NativeValue& operator=(const NativeValue& other) {
+        if (this != &other) {
+            type_ = other.type_;
+            value_ = other.value_;
+        }
+        return *this;
+    }
+
+    // Move assignment operator
+    NativeValue& operator=(NativeValue&& other) noexcept {
+        if (this != &other) {
+            type_ = std::exchange(other.type_, ValueType::Void);
+            value_ = std::exchange(other.value_, std::monostate{});
+        }
+        return *this;
+    }
     
     ValueType getType() const { return type_; }
     const Variant& getValue() const { return value_; }

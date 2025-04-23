@@ -1,13 +1,14 @@
 #pragma once
 
 #include "type_system.h"
+#include "library_platform.h"
+#include "type_registry.h"
 #include <napi.h>
 #include <string>
 #include <memory>
 #include <unordered_map>
 #include <vector>
 #include <map>
-#include <windows.h>
 
 namespace ffi_libraries {
 
@@ -20,15 +21,13 @@ public:
 private:
     static Napi::FunctionReference constructor;
 
-    using LibraryHandle = HMODULE;
-
     struct FunctionInfo {
         void* funcPtr;
         ValueType returnType;
         std::vector<ValueType> paramTypes;
     };
 
-    LibraryHandle handle_;
+    std::unique_ptr<platform::DynamicLibrary> library_;
     bool isOpen_;
     std::map<std::string, FunctionInfo> functions_;
 
@@ -38,6 +37,15 @@ private:
 
     Napi::Value CallFunction(const Napi::CallbackInfo& info);
     void Close(const Napi::CallbackInfo& info);
+    
+    // Helper for type conversion using registry
+    NativeValue ConvertToNative(const Napi::Value& value, ValueType type) {
+        return TypeRegistry::instance().getConverter(type)->toNative(value);
+    }
+    
+    Napi::Value ConvertToJS(Napi::Env env, const NativeValue& value) {
+        return TypeRegistry::instance().getConverter(value.getType())->toJS(env, value);
+    }
 };
 
 } // namespace ffi_libraries

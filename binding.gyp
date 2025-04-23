@@ -7,7 +7,8 @@
       'src/ffi_loader.cc',
       'src/type_converter.cc',
       'src/native_function_caller.cc',
-      'src/library_wrapper.cc'
+      'src/library_wrapper.cc',
+      'src/library_platform_win32.cc'
     ],
     'include_dirs': [
       "<!@(node -p \"require('node-addon-api').include\")",
