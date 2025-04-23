@@ -1,28 +1,24 @@
 const { Library } = require('../lib');
 const path = require('path');
-const _libraryPath = path.join(__dirname, 'E1_Impressora01.dll');
+const _libraryPath = path.join(__dirname, 'mp2064.dll');
 
-const lib = new Library(_libraryPath, {
-  AbreConexaoImpressora: [
-    'int32', ['int32', 'string', 'string', 'int32']
-  ],
-  FechaConexaoImpressora: [
-    'int32', []
-  ],
-  CorteTotal: [
-    'int32', ['int32']
-  ],
-  ImpressaoTexto: [
-    'int32', ['string', 'int32', 'int32', 'int32']
-  ]
-});
+// Definições mais simples usando o formato básico do node-ffi
+const funcDefs = {
+  IniciaPorta: ['int32', ['string']],
+  FechaPorta: ['int32', []],
+  AcionaGuilhotina: ['int32', ['int32']]
+};
 
-console.log(lib);
+console.log('Definições de funções:', funcDefs);
 
+const lib = new Library(_libraryPath, funcDefs);
+
+// Teste cada função com try/catch para ver erros específicos
 async function iniciar() {
   try {
     const abreConexaoImpressora = await new Promise((resolve, reject) => {
-      lib.AbreConexaoImpressora.async(0, 'USB', '1234567890', 1, (err, result) => {
+      lib.IniciaPorta.async('USB', (err, result) => {
+        console.log('IniciaPorta result:', result);
         if (err) reject(err);
         else resolve(result);
       });
@@ -30,15 +26,15 @@ async function iniciar() {
     console.log('AbreConexaoImpressora result:', abreConexaoImpressora);
 
     const corteTotal = await new Promise((resolve, reject) => {
-      lib.CorteTotal.async(1, (err, result) => {
+      lib.AcionaGuilhotina.async(1, (err, result) => {
         if (err) reject(err);
         else resolve(result);
       });
     });
-    console.log('CorteTotal result:', corteTotal);
+    console.log('AcionaGuilhotina result:', corteTotal);
 
     const fecharConexaoImpressora = await new Promise((resolve, reject) => {
-      lib.FechaConexaoImpressora.async((err, result) => {
+      lib.FechaPorta.async((err, result) => {
         if (err) reject(err);
         else resolve(result);
       });
