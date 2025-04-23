@@ -4,9 +4,11 @@ interface FunctionDefinitions {
   [key: string]: FunctionDefinition;
 }
 
+type FFICallback<T> = (error: any, value: T) => void;
+
 export interface ForeignFunction<TReturn = any, TArgs extends any[] = any[]> {
-  (...args: TArgs): TReturn;
-  async(...args: [...TArgs, (err: any, value: TReturn) => void]): void;
+  (...args: TArgs | [...TArgs, FFICallback<TReturn>]): TReturn;
+  async(...args: [...TArgs, FFICallback<TReturn>]): void;
 }
 
 const ffiBindings = require('bindings')('ffi_libraries');

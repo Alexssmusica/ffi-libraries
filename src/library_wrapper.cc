@@ -110,14 +110,113 @@ LibraryWrapper::LibraryWrapper(const Napi::CallbackInfo &info)
         funcInfo.returnType = returnType;
         funcInfo.paramTypes = paramTypeList;
 
-        Napi::Object funcObj = Napi::Object::New(env);
+        Napi::Function mainFunc = Napi::Function::New(env, [funcInfo](const Napi::CallbackInfo &cbInfo) -> Napi::Value {
+            Napi::Env cbEnv = cbInfo.Env();
+            
+            bool hasCallback = cbInfo.Length() > 0 && cbInfo[cbInfo.Length()-1].IsFunction();
+            
+            if (hasCallback) {
+                std::vector<void*> args;
+                std::vector<void*> allocations;
+                
+                try {
+                    for (size_t i = 0; i < cbInfo.Length() - 1 && i < funcInfo.paramTypes.size(); i++) {
+                        ValueType type = GetTypeFromString(funcInfo.paramTypes[i], cbEnv);
+                        void* arg = ConvertJsValueToNative(cbInfo[i], type, allocations);
+                        args.push_back(arg);
+                    }
 
-        Napi::Function syncFunc = CreateSyncWrapper(env, funcInfo);
-        funcObj = syncFunc;
+                    Napi::Function callback = cbInfo[cbInfo.Length()-1].As<Napi::Function>();
+                    
+                    class AsyncWorker : public Napi::AsyncWorker {
+                    public:
+                        AsyncWorker(Napi::Function& callback, void* funcPtr, 
+                                ValueType returnType, std::vector<void*> args)
+                            : Napi::AsyncWorker(callback), 
+                            funcPtr(funcPtr), returnType(returnType), args(args) {}
 
-        funcObj.Set("async", CreateAsyncWrapper(env, funcInfo));
+                        void Execute() override {
+                            try {
+                                result = CallNativeFunction(funcPtr, returnType, args);
+                            } catch (const std::exception& e) {
+                                SetError(e.what());
+                            }
+                        }
 
-        thisObj.Set(funcName, funcObj);
+                        void OnOK() override {
+                            Napi::HandleScope scope(Env());
+                            Callback().Call({Env().Null(), ConvertNativeToJsValue(Env(), result, returnType)});
+                            
+                            if (result && returnType != TYPE_VOID) {
+                                delete[] static_cast<uint8_t*>(result);
+                            }
+                            
+                            for (void* ptr : args) {
+                                delete[] static_cast<uint8_t*>(ptr);
+                            }
+                        }
+
+                        void OnError(const Napi::Error& e) override {
+                            Napi::HandleScope scope(Env());
+                            Callback().Call({e.Value(), Env().Undefined()});
+                            
+                            for (void* ptr : args) {
+                                delete[] static_cast<uint8_t*>(ptr);
+                            }
+                        }
+
+                    private:
+                        void* funcPtr;
+                        ValueType returnType;
+                        std::vector<void*> args;
+                        void* result = nullptr;
+                    };
+
+                    AsyncWorker* worker = new AsyncWorker(callback, funcInfo.ptr, 
+                        GetTypeFromString(funcInfo.returnType, cbEnv), std::move(args));
+                    worker->Queue();
+
+                    return cbEnv.Undefined();
+                } catch (const std::exception& e) {
+                    for (void* ptr : allocations) {
+                        delete[] static_cast<uint8_t*>(ptr);
+                    }
+                    throw Napi::Error::New(cbEnv, e.what());
+                }
+            } else {
+                std::vector<void*> args;
+                std::vector<void*> allocations;
+
+                try {
+                    for (size_t i = 0; i < cbInfo.Length() && i < funcInfo.paramTypes.size(); i++) {
+                        ValueType type = GetTypeFromString(funcInfo.paramTypes[i], cbEnv);
+                        void* arg = ConvertJsValueToNative(cbInfo[i], type, allocations);
+                        args.push_back(arg);
+                    }
+
+                    ValueType returnType = GetTypeFromString(funcInfo.returnType, cbEnv);
+                    void* result = CallNativeFunction(funcInfo.ptr, returnType, args);
+
+                    Napi::Value jsResult = ConvertNativeToJsValue(cbEnv, result, returnType);
+
+                    for (void* ptr : allocations) {
+                        delete[] static_cast<uint8_t*>(ptr);
+                    }
+                    if (result && returnType != TYPE_VOID) {
+                        delete[] static_cast<uint8_t*>(result);
+                    }
+
+                    return jsResult;
+                } catch (const std::exception& e) {
+                    for (void* ptr : allocations) {
+                        delete[] static_cast<uint8_t*>(ptr);
+                    }
+                    throw Napi::Error::New(cbEnv, e.what());
+                }
+            }
+        });
+        mainFunc.Set("async", mainFunc);
+        thisObj.Set(funcName, mainFunc);
     }
 }
 
@@ -149,117 +248,4 @@ Napi::Value LibraryWrapper::Close(const Napi::CallbackInfo &info)
         impl->libraryHandle = nullptr;
     }
     return info.Env().Undefined();
-}
-
-Napi::Function LibraryWrapper::CreateSyncWrapper(Napi::Env env, const FunctionInfo &funcInfo)
-{
-    return Napi::Function::New(env, [funcInfo](const Napi::CallbackInfo &cbInfo) -> Napi::Value
-                               {
-        Napi::Env cbEnv = cbInfo.Env();
-        std::vector<void*> args;
-        std::vector<void*> allocations;
-
-        try {
-            for (size_t i = 0; i < cbInfo.Length() && i < funcInfo.paramTypes.size(); i++) {
-                ValueType type = GetTypeFromString(funcInfo.paramTypes[i], cbEnv);
-                void* arg = ConvertJsValueToNative(cbInfo[i], type, allocations);
-                args.push_back(arg);
-            }
-
-            ValueType returnType = GetTypeFromString(funcInfo.returnType, cbEnv);
-            void* result = CallNativeFunction(funcInfo.ptr, returnType, args);
-
-            Napi::Value jsResult = ConvertNativeToJsValue(cbEnv, result, returnType);
-
-            for (void* ptr : allocations) {
-                delete[] static_cast<uint8_t*>(ptr);
-            }
-            if (result && returnType != TYPE_VOID) {
-                delete[] static_cast<uint8_t*>(result);
-            }
-
-            return jsResult;
-        } catch (const std::exception& e) {
-            for (void* ptr : allocations) {
-                delete[] static_cast<uint8_t*>(ptr);
-            }
-            throw Napi::Error::New(cbEnv, e.what());
-        } });
-}
-
-Napi::Function LibraryWrapper::CreateAsyncWrapper(Napi::Env env, const FunctionInfo &funcInfo)
-{
-    return Napi::Function::New(env, [funcInfo](const Napi::CallbackInfo &cbInfo) -> Napi::Value
-                               {
-        Napi::Env cbEnv = cbInfo.Env();
-        std::vector<void*> args;
-        std::vector<void*> allocations;
-        
-        try {
-            if (cbInfo.Length() < 1 || !cbInfo[cbInfo.Length()-1].IsFunction()) {
-                throw Napi::TypeError::New(cbEnv, "Last argument must be a callback function");
-            }
-
-            for (size_t i = 0; i < cbInfo.Length() - 1 && i < funcInfo.paramTypes.size(); i++) {
-                ValueType type = GetTypeFromString(funcInfo.paramTypes[i], cbEnv);
-                void* arg = ConvertJsValueToNative(cbInfo[i], type, allocations);
-                args.push_back(arg);
-            }
-
-            Napi::Function callback = cbInfo[cbInfo.Length()-1].As<Napi::Function>();
-
-            class AsyncWorker : public Napi::AsyncWorker {
-            public:
-                AsyncWorker(Napi::Function& callback, void* funcPtr, 
-                        ValueType returnType, std::vector<void*> args)
-                    : Napi::AsyncWorker(callback), 
-                    funcPtr(funcPtr), returnType(returnType), args(args) {}
-
-                void Execute() override {
-                    try {
-                        result = CallNativeFunction(funcPtr, returnType, args);
-                    } catch (const std::exception& e) {
-                        SetError(e.what());
-                    }
-                }
-
-                void OnOK() override {
-                    Napi::HandleScope scope(Env());
-                    Callback().Call({Env().Null(), ConvertNativeToJsValue(Env(), result, returnType)});
-                    
-                    if (result && returnType != TYPE_VOID) {
-                        delete[] static_cast<uint8_t*>(result);
-                    }
-                    
-                    for (void* ptr : args) {
-                        delete[] static_cast<uint8_t*>(ptr);
-                    }
-                }
-
-                void OnError(const Napi::Error& e) override {
-                    Napi::HandleScope scope(Env());
-                    Callback().Call({e.Value(), Env().Undefined()});
-                    
-                    for (void* ptr : args) {
-                        delete[] static_cast<uint8_t*>(ptr);
-                    }
-                }
-
-            private:
-                void* funcPtr;
-                ValueType returnType;
-                std::vector<void*> args;
-                void* result = nullptr;
-            };
-
-            AsyncWorker* worker = new AsyncWorker(callback, funcInfo.ptr, GetTypeFromString(funcInfo.returnType, cbEnv), std::move(args));
-            worker->Queue();
-
-            return cbEnv.Undefined();
-        } catch (const std::exception& e) {
-            for (void* ptr : allocations) {
-                delete[] static_cast<uint8_t*>(ptr);
-            }
-            throw Napi::Error::New(cbEnv, e.what());
-        } });
 }
