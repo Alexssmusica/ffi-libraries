@@ -10,8 +10,8 @@ const funcDefs = {
 
 try {
   const lib = new Library(_libraryPath, funcDefs);
-  console.log(lib);
+  const result = lib.IniciaPorta('COM1');
+  console.log(result);
 } catch (error) {
-  console.error('Error:', error);
-  console.error('Stack:', error.stack);
+  console.error('Error loading library:', error);
 }

@@ -1,6 +1,8 @@
 #include "library_platform.h"
 #include <windows.h>
 #include <system_error>
+#include <iostream>
+#include <sstream>
 
 namespace ffi_libraries
 {
@@ -17,14 +19,31 @@ namespace ffi_libraries
             {
                 close();
                 handle_ = LoadLibraryA(path.c_str());
-                return handle_ != nullptr;
+                if (!handle_) {
+                    DWORD error = GetLastError();
+                    std::stringstream ss;
+                    ss << "LoadLibrary failed (error " << error << "): " << getSystemErrorMessage(error);
+                    lastError_ = ss.str();
+                    return false;
+                }
+                return true;
             }
 
             void *getSymbol(const std::string &name) override
             {
-                if (!handle_)
+                if (!handle_) {
+                    lastError_ = "Cannot get symbol - library not loaded";
                     return nullptr;
-                return reinterpret_cast<void *>(GetProcAddress(handle_, name.c_str()));
+                }
+
+                void* symbol = reinterpret_cast<void *>(GetProcAddress(handle_, name.c_str()));
+                if (!symbol) {
+                    DWORD error = GetLastError();
+                    std::stringstream ss;
+                    ss << "GetProcAddress failed (error " << error << "): " << getSystemErrorMessage(error);
+                    lastError_ = ss.str();
+                }
+                return symbol;
             }
 
             void close() override
@@ -38,9 +57,15 @@ namespace ffi_libraries
 
             std::string getLastError() override
             {
-                DWORD error = ::GetLastError();
-                if (error == 0)
-                    return "";
+                return lastError_;
+            }
+
+        private:
+            HMODULE handle_;
+            std::string lastError_;
+
+            std::string getSystemErrorMessage(DWORD error) {
+                if (error == 0) return "No error";
 
                 LPSTR messageBuffer = nullptr;
                 size_t size = FormatMessageA(
@@ -52,14 +77,20 @@ namespace ffi_libraries
                     0,
                     nullptr);
 
+                if (size == 0) {
+                    return "Unknown error";
+                }
+
                 std::string message(messageBuffer, size);
                 LocalFree(messageBuffer);
 
+                // Remove trailing newlines and periods that Windows tends to add
+                while (!message.empty() && (message.back() == '\n' || message.back() == '\r' || message.back() == '.')) {
+                    message.pop_back();
+                }
+
                 return message;
             }
-
-        private:
-            HMODULE handle_;
         };
 
         std::unique_ptr<DynamicLibrary> DynamicLibrary::create()
