@@ -1,12 +1,7 @@
 #include "library_wrapper.h"
 #include "common.h"
 #include <iostream>
-
-#ifdef _WIN32
 #include <windows.h>
-#else
-#include <dlfcn.h>
-#endif
 
 struct LibraryWrapper::Impl
 {
@@ -40,12 +35,7 @@ LibraryWrapper::LibraryWrapper(const Napi::CallbackInfo &info)
     }
 
     std::string libraryPath = info[0].As<Napi::String>().Utf8Value();
-
-#ifdef _WIN32
     void *handle = LoadLibraryA(libraryPath.c_str());
-#else
-    void *handle = dlopen(libraryPath.c_str(), RTLD_NOW);
-#endif
 
     if (!handle)
     {
@@ -79,11 +69,7 @@ LibraryWrapper::LibraryWrapper(const Napi::CallbackInfo &info)
             paramTypeList.push_back(paramTypes.Get(j).As<Napi::String>().Utf8Value());
         }
 
-#ifdef _WIN32
         void *funcPtr = GetProcAddress(static_cast<HMODULE>(handle), funcName.As<Napi::String>().Utf8Value().c_str());
-#else
-        void *funcPtr = dlsym(handle, funcName.As<Napi::String>().Utf8Value().c_str());
-#endif
 
         if (!funcPtr)
         {
@@ -113,11 +99,7 @@ LibraryWrapper::~LibraryWrapper()
     {
         if (impl->libraryHandle)
         {
-#ifdef _WIN32
             FreeLibrary(static_cast<HMODULE>(impl->libraryHandle));
-#else
-            dlclose(impl->libraryHandle);
-#endif
         }
         delete impl;
     }
@@ -127,11 +109,7 @@ Napi::Value LibraryWrapper::Close(const Napi::CallbackInfo &info)
 {
     if (impl && impl->libraryHandle)
     {
-#ifdef _WIN32
         FreeLibrary(static_cast<HMODULE>(impl->libraryHandle));
-#else
-        dlclose(impl->libraryHandle);
-#endif
         impl->libraryHandle = nullptr;
     }
     return info.Env().Undefined();
