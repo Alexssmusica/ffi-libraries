@@ -1,3 +1,13 @@
+## [1.1.1](https://github.com/Alexssmusica/ffi-libraries/compare/v1.1.0...v1.1.1) (2025-04-24)
+
+
+### Bug Fixes
+
+* prebuild node ([e819fa6](https://github.com/Alexssmusica/ffi-libraries/commit/e819fa66966a5ba004ba54bb5b36bd82d2cd0d85))
+* reverte ([5d5c770](https://github.com/Alexssmusica/ffi-libraries/commit/5d5c7704198a95c813b9697ac64fc44b440fc1f1))
+* types ([ba9c2d5](https://github.com/Alexssmusica/ffi-libraries/commit/ba9c2d57ea1d48bd1d3b2f05ec8a846e4ee2b392))
+* WarningLevel ([f20bd07](https://github.com/Alexssmusica/ffi-libraries/commit/f20bd0746c0ea489d24dfc3f942f31ef137ccb1e))
+
 # [1.1.0](https://github.com/Alexssmusica/ffi-libraries/compare/v1.0.5...v1.1.0) (2025-04-23)
 
 
