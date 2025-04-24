@@ -7,7 +7,7 @@ interface FunctionDefinitions {
 type FFICallback<T> = (error: any, value: T) => void;
 
 export interface ForeignFunction<TReturn = any, TArgs extends any[] = any[]> {
-  (...args: TArgs | [...TArgs, FFICallback<TReturn>]): TReturn;
+  (...args: TArgs): TReturn;
   async(...args: [...TArgs, FFICallback<TReturn>]): void;
 }
 
