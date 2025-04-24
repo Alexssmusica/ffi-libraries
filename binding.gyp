@@ -19,12 +19,12 @@
     'conditions': [
       ['OS=="win"', {
         'defines': [ 
-          'WINDOWS',
-          '_SILENCE_ALL_CXX17_DEPRECATION_WARNINGS'
+          'WINDOWS'
         ],
         'msvs_settings': {
           'VCCLCompilerTool': { 
-            'ExceptionHandling': 1
+            'ExceptionHandling': 1,
+            'WarningLevel': '0'
           }
         }
       }]
