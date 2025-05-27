@@ -180,7 +180,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Author
 
 **Alex S.**
-- GitHub: [@
+
+- GitHub: [@Alexssmusica]
 - Email: alexssmusica@gmail.com
 
 ## Project Status
@@ -373,7 +374,8 @@ npm run rebuild
 
 ## Autor
 
-**Alex Santos de Souza**
+**Alex S.**
+
 - GitHub: [@Alexssmusica](https://github.com/Alexssmusica)
 - Email: alexssmusica@gmail.com
 
