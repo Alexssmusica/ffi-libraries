@@ -179,8 +179,8 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Author
 
-**Alex Santos de Souza**
-- GitHub: [@Alexssmusica](https://github.com/Alexssmusica)
+**Alex S.**
+- GitHub: [@
 - Email: alexssmusica@gmail.com
 
 ## Project Status
