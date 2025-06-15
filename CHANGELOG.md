@@ -1,3 +1,10 @@
+## [1.1.3](https://github.com/Alexssmusica/ffi-libraries/compare/v1.1.2...v1.1.3) (2025-06-15)
+
+
+### Bug Fixes
+
+* docs ([cb66247](https://github.com/Alexssmusica/ffi-libraries/commit/cb66247ef48a6fa754f561329f828d8759674862))
+
 ## [1.1.2](https://github.com/Alexssmusica/ffi-libraries/compare/v1.1.1...v1.1.2) (2025-04-24)
 
 
