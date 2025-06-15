@@ -385,4 +385,4 @@ Em desenvolvimento ativo - Aceitando contribuições
 
 ## Suporte
 
-Para suporte, problemas ou solicitações de recursos, por favor utilize a [página de issues do GitHub](https://github.com/Alexssmusica/ffi-libraries/issues). 
+Para suporte, problemas ou solicitações de recursos, por favor utilize a [página de issues do GitHub](https://github.com/Alexssmusica/ffi-libraries/issues).
